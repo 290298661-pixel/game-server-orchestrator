@@ -1,0 +1,19 @@
+apiVersion: director.gamefleet.io/v1alpha1
+kind: GameServerAllocation
+metadata:
+  name: match-abc123
+  namespace: game-fleet-demo
+spec:
+  fleetRef:
+    name: battle-royale-fleet
+  selectors:
+    matchLabels:
+      game-mode: battle-royale
+      map-pool: season-3
+  strategy: LowestLatency
+  players:
+    regions:
+      - cn-beijing
+      - cn-shanghai
+    preferredLatencyMs: 50
+  ttlSeconds: 30

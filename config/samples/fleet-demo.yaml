@@ -1,0 +1,87 @@
+apiVersion: director.gamefleet.io/v1alpha1
+kind: AutoscalerPolicy
+metadata:
+  name: br-scaling-policy
+  namespace: game-fleet-demo
+spec:
+  minReplicas: 2
+  maxReplicas: 20
+  buffer:
+    size: 3
+    idleTimeoutSeconds: 300
+  scalingMetric:
+    type: PlayersPerServer
+    targetValue: 80
+  auxiliaryMetrics:
+    - type: AllocationRate
+      weight: 0.3
+    - type: CPU
+      weight: 0.1
+  cooldown:
+    scaleUpSeconds: 60
+    scaleDownSeconds: 300
+  drain:
+    timeoutSeconds: 600
+    intervalSeconds: 30
+    forceAfterSeconds: 1800
+  allocation:
+    strategy: FewestPlayers
+  circuitBreaker:
+    consecutiveFailures: 5
+    cooldownPeriodSeconds: 300
+  nodeHealth:
+    enabled: true
+    provider: nhw
+    nhwEndpoint: "http://node-health-watcher.nhw-system:8080"
+    minHealthyNodeRatio: 0.5
+---
+apiVersion: director.gamefleet.io/v1alpha1
+kind: GameServerFleet
+metadata:
+  name: battle-royale-fleet
+  namespace: game-fleet-demo
+spec:
+  template:
+    metadata:
+      labels:
+        game-mode: battle-royale
+        map-pool: season-3
+    spec:
+      containers:
+        - name: game-server
+          image: registry.cn-beijing.aliyuncs.com/game-studio/battle-royale:v1.2.3
+          # 国内生产环境推荐使用阿里云 ACR / 腾讯云 TCR / 华为云 SWR
+          ports:
+            - name: game
+              containerPort: 7777
+              protocol: UDP
+            - name: metrics
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: MAX_PLAYERS
+              value: "100"
+            - name: GAME_MODE
+              value: "battle-royale"
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "2000m"
+              memory: "2Gi"
+  autoscalerRef:
+    name: br-scaling-policy
+  healthCheck:
+    httpGet:
+      path: /healthz
+      port: 8080
+    periodSeconds: 10
+    failureThreshold: 3
+  sessionQuery:
+    httpGet:
+      path: /api/v1/sessions
+      port: 8080
+    periodSeconds: 30
+  nodeSelector:
+    topology.kubernetes.io/region: cn-beijing

@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: game-fleet-director-api
+  namespace: game-fleet-system
+  labels:
+    app: game-fleet-director
+    component: apiserver
+spec:
+  type: ClusterIP
+  selector:
+    app: game-fleet-director
+    component: apiserver
+  ports:
+    - name: api
+      port: 443
+      targetPort: 8443
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: game-fleet-director-apiserver
+  namespace: game-fleet-system
+  labels:
+    app: game-fleet-director
+    component: apiserver
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: game-fleet-director
+      component: apiserver
+  template:
+    metadata:
+      labels:
+        app: game-fleet-director
+        component: apiserver
+    spec:
+      serviceAccountName: game-fleet-director-controller
+      containers:
+        - name: apiserver
+          image: registry.cn-beijing.aliyuncs.com/noneedtostudy/game-fleet-director-apiserver:v0.1.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - --api-addr=:8443
+            - --metrics-addr=:8080
+            - --rate-limit=100
+          ports:
+            - name: api
+              containerPort: 8443
+              protocol: TCP
+            - name: metrics
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: GFD_LOG_LEVEL
+              value: "info"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 5
