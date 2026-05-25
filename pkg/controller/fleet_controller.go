@@ -317,7 +317,6 @@ func (r *FleetReconciler) executeScaleUp(ctx context.Context, fleet *v1alpha1.Ga
 		log.Printf("[DRY-RUN] [fleet-controller] %s: would scale up by %d (from %d to %d)",
 			fleet.Name, result.Delta, result.CurrentReplicas, result.DesiredReplicas)
 		return nil
-t	r.recordScaleDown(fleet.Name)
 	}
 
 	log.Printf("[OK] [fleet-controller] %s: SCALE_UP +%d (%d → %d) — %s",
@@ -341,7 +340,6 @@ func (r *FleetReconciler) executeScaleDown(ctx context.Context, fleet *v1alpha1.
 			fleet.Name, -result.Delta, result.CurrentReplicas, result.DesiredReplicas)
 		return nil
 	}
-t	r.recordScaleDown(fleet.Name)
 
 	idleServers := r.PoolMgr.IdleServers(fleet.Name)
 	drainCount := -result.Delta
