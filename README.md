@@ -11,6 +11,20 @@
   <img src="https://github.com/290298661-pixel/game-server-orchestrator/actions/workflows/ci.yml/badge.svg" alt="CI">
 </p>
 
+## 目录 / Table of Contents
+
+- [概述](#概述)
+- [快速开始](#快速开始)
+- [架构](#架构)
+- [部署前必改配置](#部署前必改配置)
+- [功能模块](#功能模块)
+- [CRD 设计](#crd-设计)
+- [配置说明](#配置说明)
+- [开发](#开发)
+- [贡献](#贡献)
+- [许可证](#许可证)
+- [English](#english)
+
 ---
 
 ## 概述
@@ -361,133 +375,6 @@ Controller reconcile 时:
 ├─ 排水: lobby-server-3 (0 活跃会话)
 └─ 当前副本: 5 → 目标副本: 4
 ```
-
----
-
-## 架构
-
-```
-.
-├── cmd/
-│   ├── controller/                # K8s Controller 入口（main.go）
-│   └── apiserver/                 # REST API Server 入口（匹配器接口）
-├── api/
-│   └── v1alpha1/                  # CRD 类型定义
-│       ├── gameserverfleet_types.go       # Fleet CRD
-│       ├── autoscalerpolicy_types.go      # 伸缩策略 CRD
-│       └── gameserverallocation_types.go  # 分配请求 CRD
-├── pkg/
-│   ├── controller/                # Reconciler 实现
-│   │   ├── fleet_controller.go    # Fleet 调谐循环
-│   │   ├── alloc_controller.go    # Allocation 调谐循环
-│   │   ├── scaler.go              # 伸缩决策引擎
-│   ├── drainer/                   # 优雅排水
-│   │   ├── drainer.go             # 三阶段排水协议
-│   │   └── session_tracker.go     # 活跃会话追踪
-│   ├── pool/                      # 暖池管理
-│   │   ├── pool.go                # 暖池补充与回收
-│   │   ├── scheduler.go           # 游戏服优选调度（多策略排序）
-│   │   └── warmer.go              # 游戏服预热
-│   ├── health/                    # 健康检查集成
-│   │   ├── nhw_client.go          # Node Health Watcher API 客户端
-│   │   └── node_filter.go         # 节点健康过滤
-│   ├── metrics/                   # 指标采集
-│   │   ├── collector.go           # Prometheus 指标收集器
-│   │   └── scraper.go             # 游戏服指标抓取
-│   ├── api/                       # REST API
-│   │   ├── server.go              # HTTP Server 初始化
-│   │   ├── handler.go             # 分配 / 释放 / 查询端点
-│   │   └── middleware.go          # 认证与限流中间件
-│   └── notifier/                  # IM 通知
-│       ├── notifier.go            # 通知门面（飞书/钉钉/企业微信）
-│       └── template.go            # 消息模板渲染
-├── config/
-│   ├── crds/                      # CRD YAML manifests
-│   │   ├── gameserverfleets.yaml
-│   │   ├── autoscalerpolicies.yaml
-│   │   └── gameserverallocations.yaml
-│   ├── samples/                   # 示例 CR
-│   │   ├── fleet-demo.yaml
-│   │   └── allocation-request.yaml
-│   └── rbac/                      # RBAC（Controller 所需权限）
-│       ├── role.yaml
-│       └── role_binding.yaml
-├── deploy/
-│   ├── controller.yaml            # Controller Deployment
-│   ├── apiserver.yaml             # API Server Deployment
-│   ├── kustomization.yaml         # Kustomize 入口
-├── tests/
-│   ├── e2e/                       # 端到端测试（kind 集群 + REST API 验证）
-│   └── integration/               # 集成测试（envtest + CRD DeepCopy + Scheme 注册）
-├── Dockerfile
-├── Makefile
-├── go.mod
-├── go.sum
-└── README.md
-```
-
-### 设计决策
-
-**为什么用 Go 而不是继续用 Python？**
-
-K8s Operator 生态是 Go 的原生地。controller-runtime、client-go、controller-gen（代码生成器）全部是 Go 库。用 Python 写 Operator（kopf）也能工作，但缺少类型安全、社区规模小、生产案例少。游戏基础设施领域（Agones、Nakama、GKE Game Servers）也全部使用 Go——这是行业标准。
-
-更具体地说：CRD 的类型定义需要强类型 → JSON schema 自动生成 → deepcopy 代码生成。Go 的 `controller-gen` 在编译期完成这些，Python 只能在运行时反射，调试成本高得多。
-
-**为什么选 Operator 模式而不是外部调度器？**
-
-| 维度 | K8s Operator | 外部调度器 |
-|------|-------------|-----------|
-| **状态存储** | K8s etcd（零额外依赖） | 需要独立 DB |
-| **权限模型** | RBAC 原生集成 | 需自建 |
-| **声明式语义** | CRD kubectl apply → reconcile | 需自建 DSL |
-| **高可用** | Deployment + Leader Election | 需自建 |
-| **可观测性** | Prometheus metrics 标准暴露 | 需自建 |
-| **社区认知** | 面试官熟悉的模式 | 需要解释 |
-
-**为什么用玩家数而非 CPU/内存作为主伸缩指标？**
-
-游戏服的负载特征与 Web 服务根本不同：
-
-- 一个满员对局服（100 玩家，40% CPU）**必须保护**
-- 一个空闲匹配服（0 玩家，30% CPU）**可以回收**
-- CPU 无法区分这两种状态——30% vs 40% 在统计上几乎相同
-
-玩家数是游戏服的"第一性指标"——它直接对应业务价值。CPU/内存、分配率、会话时长作为辅助维度，防止异常（例如某个服的玩家在做大量物理计算导致 CPU 飙升）。
-
-**优雅排水协议为什么设计三阶段？**
-
-一阶段 CORDON 和二阶段 DRAIN 的分离是最关键的。如果我们直接发送 SIGTERM，游戏服的 `terminationGracePeriodSeconds`（通常 30s）根本不够一场 20 分钟的对局结束。三阶段分离后：
-
-- CORDON 立即生效（0s）→ 不再有新玩家进入
-- DRAIN 拥有独立的超时（`drain_timeout`，默认 10min）→ 给足够时间让对局自然结束
-- DECOMMISSION 复用 K8s 原生的 Pod 终止流程 → 不需要改造游戏服
-
-**暖池与 HPA 的区别？**
-
-HPA 是"反应式"的——指标上升后才扩容，Pod 冷启动期间玩家等待。暖池是"预判式"的——始终维护 N 台就绪服，分配请求即时响应。两者可以共存：HPA 根据总体玩家趋势调整 `bufferSize`，暖池负责即时响应。
-
-**为什么允许不依赖 Node Health Watcher 独立运行？**
-
-每个运维团队的工具体系不同。Game Fleet Director 的节点健康感知通过可插拔的 `HealthProvider` 接口实现：
-
-```go
-type HealthProvider interface {
-    GetNodeHealth(ctx context.Context) (map[string]NodeHealth, error)
-}
-```
-
-默认提供 `NHWHealthProvider`（调用 Node Health Watcher API）和 `StaticHealthProvider`（从 ConfigMap 读取静态健康列表）。你也可以实现自己的 Provider 对接公司内部的 CMDB 或监控系统。
-
-**干运行模式**
-
-对 Fleet CR 添加 `director.gamefleet.io/dry-run: "true"` 注解后，Controller 仍执行完整的 reconcile 循环（指标采集 → 策略评估 → 决策计算），但跳过实际的 Pod 创建/删除操作。决策日志以 `[DRY-RUN]` 前缀输出，便于审计和策略调试。
-
-**熔断机制**
-
-连续 N 次 reconcile 失败（默认 5 次）→ Controller 暂停该 Fleet 的伸缩操作 5 分钟 → 推送 IM 告警 → 等待人工介入。防止错误策略（如指标采集器故障导致玩家数误报为 0）引发大规模误缩容。
-
----
 
 ## CRD 设计
 
