@@ -38,7 +38,7 @@ spec:
           # imagePullSecrets:
           #   - name: acr-secret
           args:
-            - --metrics-addr=:8080
+            - --metrics-addr=:8081
             - --namespace=game-fleet-system
             - --resync-period=15s
             - --leader-elect=true
@@ -65,12 +65,12 @@ spec:
           livenessProbe:
             httpGet:
               path: /healthz
-              port: 8080
+              port: 8081
             initialDelaySeconds: 10
             periodSeconds: 15
           readinessProbe:
             httpGet:
               path: /readyz
-              port: 8080
+              port: 8081
             initialDelaySeconds: 5
             periodSeconds: 10
