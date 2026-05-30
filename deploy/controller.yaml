@@ -66,11 +66,13 @@ spec:
             httpGet:
               path: /healthz
               port: 8081
-            initialDelaySeconds: 10
-            periodSeconds: 15
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            failureThreshold: 5
           readinessProbe:
             httpGet:
               path: /readyz
               port: 8081
-            initialDelaySeconds: 5
+            initialDelaySeconds: 15
             periodSeconds: 10
+            failureThreshold: 3
