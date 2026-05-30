@@ -18,7 +18,7 @@ metadata:
     app: game-fleet-director
     component: controller
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: game-fleet-director
@@ -34,18 +34,10 @@ spec:
         - name: controller
           image: registry.cn-beijing.aliyuncs.com/noneedtostudy/game-fleet-director-controller:v0.1.0
           imagePullPolicy: IfNotPresent
-          # 若使用私有仓库，须配置 imagePullSecrets 或在 ServiceAccount 中挂载
-          # imagePullSecrets:
-          #   - name: acr-secret
           args:
-            - --metrics-addr=:8081
+            - --metrics-addr=:0
             - --namespace=game-fleet-system
             - --resync-period=15s
-            - --leader-elect=true
-          ports:
-            - name: metrics
-              containerPort: 8080
-              protocol: TCP
           env:
             - name: GFD_NHW_ENDPOINT
               value: ""
@@ -63,16 +55,18 @@ spec:
               cpu: 500m
               memory: 512Mi
           livenessProbe:
-            httpGet:
-              path: /healthz
-              port: 8081
+            exec:
+              command:
+                - pgrep
+                - game-fleet-director
             initialDelaySeconds: 30
             periodSeconds: 20
             failureThreshold: 5
           readinessProbe:
-            httpGet:
-              path: /readyz
-              port: 8081
-            initialDelaySeconds: 15
+            exec:
+              command:
+                - pgrep
+                - game-fleet-director
+            initialDelaySeconds: 10
             periodSeconds: 10
             failureThreshold: 3
