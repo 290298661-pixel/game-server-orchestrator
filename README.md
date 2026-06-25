@@ -11,6 +11,10 @@
   <img src="https://github.com/290298661-pixel/game-server-orchestrator/actions/workflows/ci.yml/badge.svg" alt="CI">
 </p>
 ##该项目已被放弃,仅供参考!!!
+
+---
+
+
 ## 目录 / Table of Contents
 
 - [概述](#概述)
@@ -25,7 +29,7 @@
 - [许可证](#许可证)
 - [English](#english)
 
----
+
 
 ## 概述
 
